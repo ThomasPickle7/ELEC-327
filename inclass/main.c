@@ -12,10 +12,8 @@ int main(void)
     P1DIR |= 0x01;                          // Set P1.0 to output direction
 
 
-    char *test[11] = {".", ".", ".", " ", "-", "-", "-", " ", ".", ".", "."};     //SOS Signal
-    /*char *test[9] = {"-", " ",
-                       ".", "-", " ",
-                       ".", "-", "-", "."};     Initials Signal */
+    //char *test[11] = {".", ".", ".", " ", "-", "-", "-", " ", ".", ".", "."};     //SOS Signal
+    char *test[9] = {"-", " ", ".", "-", " ", ".", "-", "-", "."};     //Initials Signal
     __bis_SR_register(GIE);                 // Enable interrupt
     while (1) {
         int i;

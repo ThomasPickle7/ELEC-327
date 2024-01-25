@@ -9,8 +9,8 @@ double compute_sum(char *input_data) {
   while(input_data[header_end] != 'e'){
     header_end++;
   }
-
-
+  int new_char;
+  new_char = 0;
   header = 0;
   sum = 0;
   //data starts 1 ahead of the header to account for the 'e' charachter
@@ -58,9 +58,68 @@ double compute_sum(char *input_data) {
       //the position in data is incremented according to the data type
       pos_data = pos_data + 8;
     }
+    //if the s is indicated, we know were at the struct and can break from the general loop
+    if(input_data[header] == 's'){
+      //increments by one so that s isnt counted in the sum
+      header++;
+      break;
+
+    }
+    header++;  
+  }
+  //resumes fromwhere the main loop left off
+  while(header < header_end){
+    
+    //both cases will parse either 4 bytes or 0, so indexing is easily maintained
+    if(input_data[header] == 'b'){
+      //creates a char instance
+      char b_val;
+      //checks to see whether or not the next data type is an int
+
+      if (new_char % 4 == 0){
+        //adds the next 4 bytes as chars, since all four are chars
+        b_val = *(char*)(&input_data[pos_data]);
+        b_val = b_val + *(char*)(&input_data[pos_data + 1]);
+        b_val = b_val + *(char*)(&input_data[pos_data + 2]);
+        b_val = b_val + *(char*)(&input_data[pos_data + 3]);
+        
+        // the val is added to the sum
+        sum = sum + b_val;
+        //the position in data is incremented to go to the next 4-byte segment
+        pos_data = pos_data + 4;
+        
+            
+      }
+      else if(input_data[header + 1] == 'i'){
+        //if the next type is an int, only adds itself and doesnt count for new chars
+        b_val = *(char*)(&input_data[pos_data]);
+        //the val of just the char is added
+        sum = sum + b_val;
+        //Since we know an int is next, we reset the char count for the next time one is enountered
+        new_char = 0;
+        //skips four indexes to get to int data
+        pos_data = pos_data + 4; 
+      }
+      //otherwise, we assume the next data is a char and proceed
+      printf("int: %d\n", &sum);
+      //a charachter is added to indicate that one has been parsed
+      new_char = new_char + 1;      
+    }
+    if(input_data[header] == 'i'){
+      //creates a integer instance
+      int i_val;
+      //casts a pointer to the current position in the input data, according to the data type indicated by the header
+      i_val = *(int*)(&input_data[pos_data]);
+      // the val is added to the sum
+      sum += i_val;
+      //the position in data is incremented according to the data type
+      pos_data = pos_data + 4;
+    }
     //once all cases are checked, the header increments to the next entry
     header++; 
-  }                 
+  }
+
+
   return sum;
 }
 
