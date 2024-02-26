@@ -1,73 +1,88 @@
+/*
+    *   Thomas Pickell
+    *   Lab 5: Timer
+    *   Demo Link: https://drive.google.com/file/d/1eJGeQZbRZbEruSpYgE8sU4LxsXzv_DIf/view?usp=sharing
+    *   *IMPORTANT: the cameras refresh rate makes the display appear to flicker in both modes, but it only does so in time-setting mode.
+    * 
+    *   Created on: Feb 25, 2024
+*/
+
 #include <msp430g2452.h>
 
-// TODO!!!!
-#define ONE_SEC 30000    // You'll need to set this to achieve 1 second interrupts!
-#define REFRESH 100     // You'll need to set this to for refresh!
+// Global variables, explained as they appear in the code
+volatile char value = 9;
+volatile char pressed = 0;
+// 0 = countdown mode, 1 = time-setting mode
+volatile char mode = 0;
+volatile char set_flag = 0;
+volatile char stop_flag = 0;
+volatile char inc_flag = 0;
+volatile unsigned first_flag = 0;
 
-// For pixels to be turned on, the column value has
-//   to be 1, and the row has to be zero. So a blank
-//   display looks like this:
+
+volatile int counter = 0;
+volatile int dec_counter = 0;
+
+// Constants for timing
+#define ONE_SEC 10000
+#define REFRESH 40
+
+// Character patterns for displaying numbers
 char blank_screen[5] = { 0x7F, 0x7F, 0x7F, 0x7F, 0x7F};
-
-
 char zero[5] = { 0x3E, 0x51, 0x49, 0x45, 0x3E };
-
 char one[5] = { 0x00, 0x01, 0x7F, 0x21, 0x00 };
-
 char two[5] = { 0x31, 0x49, 0x45, 0x43, 0x21 };
-
 char three[5] = { 0x36, 0x49, 0x49, 0x41, 0x22 };
-
 char four[5] = { 0x04, 0x7F, 0x24, 0x14, 0x0C };
-
 char five[5] = { 0x4E, 0x51, 0x51, 0x51, 0x72 };
-
 char six[5] = { 0x26, 0x49, 0x49, 0x49, 0x3E };
-
 char seven[5] = { 0x60, 0x50, 0x48, 0x47, 0x40 };
-
 char eight[5] = { 0x36, 0x49, 0x49, 0x49, 0x36 };
-
 char nine[5] = { 0x3E, 0x49, 0x49, 0x49, 0x32 };
-
 char *numbers[10];
 
+// Variables for display update
 char *current_character;
+unsigned char current_column = 0;
 
-int current_column = 0;
-
-// TODO!!!!
+// Function to refresh the display
 void refresh(void) {
-    // only 5 columns exist! indexing starts at 0
     if (current_column > 4)
         current_column = 0;
-    // Iterate through columns
     P2OUT = 0x01 << current_column;
     P1OUT = ~current_character[current_column++];
-    // NOTE - outputs are inverted. We invert here to make it easier.
 }
 
-void update_display(int value) {
+// Function to update the display with a given value
+void update_display(char value) {
     current_character = numbers[value];
 }
 
+void main(void){
+    // Disable watchdog timer
+    WDTCTL = WDTPW + WDTHOLD;
 
-void main(void)
-{
-    WDTCTL = WDTPW + WDTHOLD;    // Stop WDT
-    BCSCTL3 |= LFXT1S_2;         // ACLK = VLO
+    // Set LFXT1 to VLOCLK
+    BCSCTL3 |= LFXT1S_2;
 
-    // Configure Timer A0 to give us interrupts being driven by ACLK
-    TA0CTL = TASSEL_1 + MC_2 + TAIE;  // ACLK, upmode, counter interrupt enable
+    // Configure Timer A0
+    TA0CTL = TASSEL_1 + MC_2 + TAIE;
+    TA0CCR0 = ONE_SEC;
+    TA0CCR1 = REFRESH;
+    TA0CCTL0 = CCIE;
+    TA0CCTL1 = CCIE;
 
-    TA0CCR0 = ONE_SEC;  // Register 0 counter value to trigger interrupt
-    TA0CCR1 = REFRESH;  // Register 1 counter value to trigger interrupt
+    // Configure Ports
+    P1DIR |= BIT0|BIT1|BIT2|BIT3|BIT4|BIT5|BIT6;
+    P2DIR |= BIT0|BIT1|BIT2|BIT3|BIT4;
+    P1OUT = BIT0|BIT1|BIT2|BIT3|BIT4|BIT5|BIT6;
+    P2OUT = BIT0|BIT1|BIT2|BIT3|BIT4;
+    P1REN |= BIT7;
+    P1IE |= BIT7;
+    P1IES |= BIT7;
+    P1IFG &= 0;
 
-    TA0CCTL0 = CCIE;    // CCR0 interrupt enabled
-    TA0CCTL1 = CCIE;    // CCR1 interrupt enabled
-
-    P1DIR |= BIT7;  // configure P1 as output
-
+    // Initialize character patterns for numbers
     numbers[0] = zero;
     numbers[1] = one;
     numbers[2] = two;
@@ -79,52 +94,40 @@ void main(void)
     numbers[8] = eight;
     numbers[9] = nine;
 
+    // Set initial display character
     current_character = numbers[9];
 
-    int value = 9;
-    //boolean to toggle mode, true = 'time-setting mode', false = 'counting-down mode'
-    bool toggle_mode = true;
-    //boolean to toggle increment, true = 'increment', false = 'decrement'
-    bool increment = false;
+    // Enable interrupts
+    __enable_interrupt();
 
-    __enable_interrupt();   // equivalent to __bis_SR_register(GIE)
+    while(1){
+        
 
-    while(1)
-    {
-        //checks to see if in time-setting mode
-        if(~time_setting_mode){
-            //checks to see if function is at 0, doesnt decrement if so
-            if(value == 0){
-                value = 0;
-            }else{
-                value = value - 1;
-            }
-        }else{
-            //checks to see if increment or decrement is true
-            if(increment){
-                //checks to see if function is at 9, doesnt increment if so
-                if(value == 9){
-                    value = 9;
-                }else{
-                value = value + 1;
-                }
-            }else{
-                //checks to see if function is at 0, doesnt decrement if so
+        // Check if in time setting mode and not stopped
+        if((mode == 0) & (stop_flag == 0)){
+            // Decrease the value by 1
+            if(~(value >= 0)){
                 if(value == 0){
-                    value = 0;
-                }else{
-                    value = value - 1;
+                    value++;
                 }
+                value--;
+            }else{
+                value = 0;
+            }
+            // Wrap around if value exceeds 9
+            if (value >= 10){
+                value = 0;
             }
         }
-    
-        __low_power_mode_3(); // equivalent to __bis_SR_register(LPM3_bits);     // Enter LPM3
+        // Update the display with the current value
         update_display(value);
 
+        // Enter low power mode 3
+        __low_power_mode_3();
     }
 }
 
-// Timer 0 interrupt service routine for register 0 (count)
+// Timer A0 interrupt service routine
 #if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
 #pragma vector=TIMER0_A0_VECTOR
 __interrupt void Timer0_A0 (void)
@@ -134,11 +137,19 @@ void __attribute__ ((interrupt(TIMER0_A0_VECTOR))) Timer_A0 (void)
 #error Compiler not supported!
 #endif
 {
-    TA0CCR0 += ONE_SEC;                       // Increment register 0 value for next interrupt
-    __bic_SR_register_on_exit(LPM3_bits);     // Clear LPM3 bits from 0(SR)
+    // Increase TA0CCR0 by ONE_SEC
+    TA0CCR0 += ONE_SEC;
+
+    // Exit low power mode 3
+    __bic_SR_register_on_exit(LPM3_bits);
+
+    // Check if button is pressed, meaning the mode should be changed and sets flag accordingly
+    if(pressed == 1){
+        set_flag = 1;
+    }
 }
 
-// Timer 0 interrupt service routine for register 1 (refresh)
+// Timer A1 interrupt service routine
 #if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
 #pragma vector=TIMER0_A1_VECTOR
 __interrupt void Timer0_A1 (void)
@@ -148,66 +159,133 @@ void __attribute__ ((interrupt(TIMER0_A1_VECTOR))) Timer_A1 (void)
 #error Compiler not supported!
 #endif
 {
-    if (TAIV == TA0IV_TACCR1){
-        TA0CCR1 += REFRESH;     // Increment register 1 value for next interrupt
-        refresh();              // Refresh
+    // Check if in time setting mode
+    if(mode == 0){
+        // Check if interrupt is from TA0CCR1
+        if (TAIV == TA0IV_TACCR1){
+            // Normal refresh rate
+            TA0CCR1 += REFRESH;
+            // Refresh the display
+            refresh();
+        }
+    }else{
+        // Check if interrupt is from TA0CCR1
+        if (TAIV == TA0IV_TACCR1){
+            // Flashing refresh rate for Extra Credit
+            TA0CCR1 += 180;
+            // Refresh the display
+            refresh();
+        }
+    }
+
+    // Check if in time setting mode and button is pressed
+    if((mode == 1) & (set_flag == 1) & (pressed == 1)){
+        // checks if the button has been pressed for 400 refreshes, or 'more than a second'
+        if(counter < 400){
+            //increments the timer if the threshold hasnt been reached
+            counter++;
+        }else{
+            //if it has, the increment flag is raised and we know to increment the vimer
+            inc_flag = 1;
+            value++;
+            // Wrap around if value exceeds 9
+            if(value > 9){
+                value = 0;
+            }
+            counter = 0;
+        }
+    }
+
+    // Check if in time setting mode and button is pressed
+    if((mode == 1) & (pressed == 1)){
+        // Check if dec_counter is 0
+        if(dec_counter == 0){
+            dec_counter++;
+        }
+        // Check if the button has been pressed for only 2 cycles, IE a fast press
+        else if (dec_counter > 2){
+            dec_counter = 0;
+            // Decrease value by 3 to compensate for the increase brought by pressing the button twice.
+            value = value - 3;
+        }
+    }
+    // Check if in time setting mode
+    else if (mode == 1){
+        // Check if dec_counter is greater than 0
+        if(dec_counter > 0){
+            dec_counter++;
+        }
+        // Check if dec_counter is greater than 50, meaning the button has not been pressed for a while
+        if(dec_counter > 50){
+            dec_counter = 0;
+        }
     }
 }
 
-// Define button status and the button variable
-int BUTTON_STATUS_NOTPRESSED;
-int BUTTON_STATUS_HOLDING;
-int BUTTON_STATUS_RELEASED;
-int BUTTON_STATUS_NOTPRESSED;
-
-// Define button state values (if inverted then swap the values, assume input at bit 1)
-BUTTON_STATE_NOTPRESSED = 0;
-BUTTON_STATE_PRESSED = BIT7;
-
-// Setup timer hardware for 1 ms ticks
-TA0CCR0 = 125;
-TA0CCTL0 = CCIE;
-TA0CTL = TASSEL_2 | ID_3 | MC_1 | TACLR;
-
-// Process the button events for every timer tick
-#pragma vector=TIMER0_A0_VECTOR
-__interrupt void Timer_A0(void) // Better name would be Timer_A0_2_ISR
+// Port 1 interrupt service routine
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector=PORT1_VECTOR
+__interrupt void PORT1_ISR(void)
+#elif defined(__GNUC__)
+void __attribute__((interrupt(PORT1_VECTOR))) PORT1_ISR(void)
+#else
+#error Compiler not supported!
+#endif
 {
-  // Local variable for counting ticks when button is pressed
-  // Assume nobody will ever hold the button for 2^32 ticks long!
-  static uint32_t counter = 0;
-  
-  // Constant for measuring how long (ms) the button must be held
-  // Adjust this value to feel right for a single button press
-  const uint32_t BUTTON_PRESSED_THRES = 50;
-  
-  // Check status of button, assume P2.1 input for the button
-  // Note once the button enters release status, other code must change back to not pressed
-  switch (button)
-  {
-    //if the button is gheld for longer than 50ms, it is considered to be holding
-    case BUTTON_STATUS_NOTPRESSED:
-      // Increment if pressed, else reset the count
-      // This will filter out the noise when starting to press
-      if ((P2IN & BIT7) == BUTTON_STATE_PRESSED) counter += 1;
-      else counter = 0;
-      if (counter > BUTTON_PRESSED_THRES) button = BUTTON_STATUS_HOLDING;
-      break;
-    
+    // Check if it is the first interrupt
+    if(first_flag == 1){
+        // Toggle the edge select for button interrupt
+        P1IES ^= BIT7;
 
-    case BUTTON_STATUS_HOLDING:
-      // Decrement if not pressed, else set the count to threshold
-      // This will filter out the noise when starting to release
-      if ((P2IN & BIT1) == BUTTON_STATE_NOTPRESSED) counter = 0;
-      else counter = BUTTON_PRESSED_THRES;
-      if (counter == 0) button = BUTTON_STATUS_RELEASED;
-      break;
-  }
-}
-// Your other code to detect when the button has been pressed and release
-if (button == BUTTON_STATUS_RELEASED)
-{
-    toggle_mode = ~toggle_mode;
-    // Must reset after detecting button has been release
-    button = BUTTON_STATUS_NOTPRESSED;
+        // Check if in time setting mode
+        if(mode == 0){
+            // Check if button is pressed
+            if(pressed == 1){
+                // Check if set_flag is set
+                if(set_flag == 1){
+                    // Switch to time setting mode
+                    mode = 1;
+                    set_flag = 0;
+                    stop_flag = 0;
+                }else{
+                    // Toggle stop_flag
+                    stop_flag ^= 0x01;
+                }
+            }
+        }else{
+            // Check if button is pressed
+            if(pressed == 1){
+                // Check if increment flag is set
+                if(inc_flag == 1){
+                    inc_flag = 0;
+                    set_flag = 0;
+                }else{
+                    // Check if set_flag is set
+                    if(set_flag == 1){
+                        // Switch to normal mode
+                        mode = 0;
+                        set_flag = 0;
+                    }else{
+                        // Increase value by 1
+                        value++;
+                    }
+                }
+            }
+        }
+
+        // Toggle pressed flag
+        if(pressed == 0){
+            pressed = 1;
+        }else{
+            pressed = 0;
+        }
+
+        // Clear interrupt flag
+        P1IFG &= ~BIT7;
+    }else{
+        // Increment first_flag
+        first_flag++;
+        // Clear interrupt flag
+        P1IFG &= ~BIT7;
+    }
 }
