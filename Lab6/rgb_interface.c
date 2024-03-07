@@ -13,45 +13,42 @@
 uint8_t start_frame[] = {0,0,0,0};
 uint8_t end_frame[] = {0xFF,0xFF,0xFF,0xFF};
 //an alphabet of RGB values
-uint8_t a[] = {0xF0, 25, 0, 0};
-uint8_t b[] = {0xF0, 25, 6, 0};
-uint8_t c[] = {0xF0, 25, 13, 0};
-uint8_t d[] = {0xF0, 25, 19, 0};
+uint8_t a[] = {0xF0, 2, 0, 25};
+uint8_t b[] = {0xF0, 6, 0, 25};
+uint8_t c[] = {0xF0, 11, 0, 25};
+uint8_t d[] = {0xF0, 16, 0, 25};
+uint8_t e[] = {0xF0, 21, 0, 25};
+uint8_t f[] = {0xF0, 25, 0, 25};
+uint8_t g[] = {0xF0, 25, 0, 20};
+uint8_t h[] = {0xF0, 25, 0, 15};
+uint8_t i[] = {0xF0, 25, 0, 10};
+uint8_t j[] = {0xF0, 25, 0, 6};
+uint8_t k[] = {0xF0, 25, 0, 1};
+uint8_t l[] = {0xF0, 25, 3, 0};
+uint8_t m[] = {0xF0, 25, 8, 0};
+uint8_t n[] = {0xF0, 25, 13, 0};
+uint8_t o[] = {0xF0, 25, 17, 0};
+uint8_t p[] = {0xF0, 25, 22, 0};
+uint8_t q[] = {0xF0, 25, 22, 0};
+uint8_t r[] = {0xF0, 24, 25, 0};
+uint8_t s[] = {0xF0, 20, 25, 0};
+uint8_t t[] = {0xF0, 16, 25, 0};
+uint8_t u[] = {0xF0, 12, 25, 0};
+uint8_t v[] = {0xF0, 7, 25, 0};
+uint8_t w[] = {0xF0, 3, 25, 0};
+uint8_t x[] = {0xF0, 0, 25, 0};
+uint8_t y[] = {0xF0, 0, 25, 4};
+uint8_t z[] = {0xF0, 0, 25, 8};
+uint8_t aa[] = {0xF0, 0, 25, 12};
+uint8_t ab[] = {0xF0, 0, 25, 16};
+uint8_t ac[] = {0xF0, 0, 25, 21};
+uint8_t ad[] = {0xF0, 0, 25, 25};
+uint8_t ae[] = {0xF0, 0, 22, 25};
+uint8_t af[] = {0xF0, 0, 18, 25};
 
-uint8_t e[] = {0xF0, 25, 25, 0};
-uint8_t f[] = {0xF0, 19, 25, 0};
-uint8_t g[] = {0xF0, 13, 25, 0};
-uint8_t h[] = {0xF0, 6, 25, 0};
 
-uint8_t i[] = {0xF0, 0, 25, 0};
-uint8_t j[] = {0xF0, 0, 25, 6};
-uint8_t k[] = {0xF0, 0, 25, 13};
-uint8_t l[] = {0xF0, 0, 25, 19};
 
-uint8_t m[] = {0xF0, 0, 25, 25};
-uint8_t n[] = {0xF0, 0, 19, 25};
-uint8_t o[] = {0xF0, 0, 13, 25};
-uint8_t p[] = {0xF0, 0, 6, 25};
 
-uint8_t q[] = {0xF0, 0, 0, 25};
-uint8_t r[] = {0xF0, 6, 0, 25};
-uint8_t s[] = {0xF0, 13, 0, 25};
-uint8_t t[] = {0xF0, 19, 0, 25};
-
-uint8_t u[] = {0xF0, 25, 0, 25};
-uint8_t v[] = {0xF0, 25, 0, 19};
-uint8_t w[] = {0xF0, 25, 0, 13};
-uint8_t x[] = {0xF0, 25, 0, 6};
-
-uint8_t y[] = {0xF0, 25, 0, 0};
-uint8_t z[] = {0xF0, 25, 6, 0};
-uint8_t aa[] = {0xF0, 25, 13, 0};
-uint8_t ab[] = {0xF0, 25, 19, 0};
-
-uint8_t ac[] = {0xF0, 20, 0, 0};
-uint8_t ad[] = {0xF0, 16, 0, 0};
-uint8_t ae[] = {0xF0, 12, 0, 0};
-uint8_t af[] = {0xF0, 8, 0, 0};
 
 uint8_t off[] = {0xE0, 0, 0, 0};
 
