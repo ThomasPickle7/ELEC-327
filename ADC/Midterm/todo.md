@@ -28,4 +28,5 @@ ideas:
     - Returns the players score in the terminal.
     - if the player presses the wrong button, the game ends.
 
+This is a bruh moment
 
