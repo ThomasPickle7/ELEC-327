@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/tapic/Documents/GitHub/ELEC-327/inclass",
-      "program": "c:/Users/tapic/Documents/GitHub/ELEC-327/inclass/build/Debug/outDebug",
+      "cwd": "c:/Users/tapic/Documents/GitHub/ELEC-327/Labs/Lab1",
+      "program": "c:/Users/tapic/Documents/GitHub/ELEC-327/Labs/Lab1/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

@@ -28,5 +28,14 @@ ideas:
     - Returns the players score in the terminal.
     - if the player presses the wrong button, the game ends.
 
-This is a bruh moment
+## Schedule:
+**DUE DATE: 3/27/2024 at 11:59 PM**
+- Pre-Exams: 
+    - Compile existing code and make sure it works as expected.
+        - Have all code in GitHub Repo for reference later by Wednesday 3/20/2024
+    - put hardware together and make sure it works as expected.
+- After Exams:
+    - Put code together, squash bugs, and make sure it works as expected.
+    - test, make sure comments are there and it makes sense
+
 
