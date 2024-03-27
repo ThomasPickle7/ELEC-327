@@ -12,7 +12,7 @@
  *
  * Piano Tiles:
  *
- * 
+ *
  * GRADERS: To switch between Simon and Piano Tiles, change the value of game_toggle to 0 or 1 (line 88)
  *  To change the number of rounds in Simon, change the value of ROUNDS (line 84)
  * To change the difficulty of the game, change the value of DIFFICULTY (line 82)
@@ -289,6 +289,7 @@ void main(void)
                 // iterates through every round up to the current one
                 while (a < cur_round)
                 {
+                    rgb_set_LEDs(off, off, off, off);
                     // if the timer is at 20, it will play the next button press in the sequence
                     if (timer_present == 20)
                     {
@@ -401,7 +402,7 @@ void main(void)
                         state = Lost;
                         break;
                     }
-                    // sends the score to the UART  
+                    // sends the score to the UART
                     itoa((int)button_on, mv_char);
                     ser_output("SCORE");
                     ser_output(mv_char);
@@ -409,8 +410,7 @@ void main(void)
                     // if the user presses the correct button, it will light the button and buzz
                     if (button_on == sequence[j])
                     {
-                        button_light(sequence[j]);
-                        button_buzz(sequence[j]);
+                        continue;
                     }
                     // if the user presses the wrong button, they lose
                     else
@@ -418,7 +418,7 @@ void main(void)
                         state = Lost;
                         break;
                     }
-                    
+
                     rgb_set_LEDs(off, off, off, off);
                     buzz(OFF_BUZZ);
                 }
@@ -489,24 +489,32 @@ __interrupt void PORT2_ISR(void)
     // red button
     if ((P2IFG & BIT0) && (timer_but == 2))
     {
+        button_light(1);
+        button_buzz(1);
         button_on = 1;
         timer_but = 0;
     }
     // green button
     else if ((P2IFG & BIT2) && (timer_but == 2))
     {
+        button_light(2);
+        button_buzz(2);
         button_on = 2;
         timer_but = 0;
     }
     // yellow button
     else if ((P2IFG & BIT3) && (timer_but == 2))
     {
+        button_light(3);
+        button_buzz(3);
         button_on = 3;
         timer_but = 0;
     }
     // blue button
     else if ((P2IFG & BIT4) && (timer_but == 2))
     {
+        button_light(4);
+        button_buzz(4);
         button_on = 4;
         timer_but = 0;
     }
@@ -515,6 +523,7 @@ __interrupt void PORT2_ISR(void)
     {
         button_on = 0;
     }
+    rgb_set_LEDs(off, off, off, off);
     P2IFG &= ~(BIT0 + BIT2 + BIT3 + BIT4);
     __bic_SR_register_on_exit(LPM4_bits);
 }
