@@ -190,12 +190,6 @@ void main(void)
     char sequence[rounds];//GRADERS: change this value to alter the number of rounds
 
     char i = 0;
-    srand(timer);
-    // Fill the sequence with random button presses
-    for (i = 0; i < sizeof(sequence); i++)
-    {
-        sequence[i] = rand() + 1;
-    }
     // Set the initial state to play the Win sequence
     state = Win;
     // Enable global interrupts
