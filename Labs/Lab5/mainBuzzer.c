@@ -113,11 +113,7 @@ TA1CCTL2 = OUTMOD_7;
 // Set the timer A1 control register to use the SMCLK as the clock source and count up to CCR0
 TA1CTL = TASSEL_2 + MC_1;
 
-// Set the watchdog timer interval to 250ms
-WDTCTL = WDT_ADLY_250;
 
-// Enable the watchdog timer interrupt
-IE1 |= WDTIE;
   __bis_SR_register(CPUOFF + GIE);
   while (1){
             //plays whichever song should be played based on the mary flag

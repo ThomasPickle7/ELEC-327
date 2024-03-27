@@ -1,275 +1,286 @@
-#include <msp430.h> 
+#include <msp430.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "rgb_interface.h"
-#include "simon_random.h"
-/**
- * main.c
- */
-void init_wdt(void){
-    BCSCTL3 |= LFXT1S_2;     // ACLK = VLO
-    WDTCTL = WDT_ADLY_1000;    // WDT 16ms (~43.3ms since clk 12khz), ACLK, interval timer
-    IE1 |= WDTIE;            // Enable WDT interrupt
-}
-void init_buttons() {
-    P2DIR &= ~(BIT0 + BIT2 + BIT3 + BIT4); // set to input
-    P2REN = BIT0 + BIT2 + BIT3 + BIT4; // enable pullup/down resistors
-    P2OUT = BIT0 + BIT2 + BIT3 + BIT4; // set resistors to pull up
+/*CONSTANTS*/
+uint8_t red[] = {0xF0, 0, 0, 10};
+uint8_t blue[] = {0xF0, 10, 0, 0};
+uint8_t green[] = {0xF0, 0, 10, 0};
+uint8_t yellow[] = {0xF0, 0, 10, 10};
+uint8_t off[] = {0xE0, 0, 0, 0};
+int button_on = 0;
+int timer_but = 0;
+int timer_seq = 0;
+int timer_present = 0;
 
-    /* Uncomment the following code if you want to use interrupts to detect button presses */
-    P2IES = BIT0 + BIT2 + BIT3 + BIT4; // listen for high to low transitions
-    P2IFG &=  ~(BIT0 + BIT2 + BIT3 + BIT4); // clear any pending interrupts
-    P2IE = BIT0 + BIT2 + BIT3 + BIT4; // enable interrupts for these pins
-    
-}
+#define ROUNDS = 10
+int cur_round = 1;
 
-int womp_womp[] = {
+int button_wakeup_flag = 0;
+int wdt_wakeup_flag = 0;
+
+// The sequence of frequencies to play for the win state
+unsigned int win[] = {100000/440.00,
+    100000/493.88,
+    100000/523.25,
+    100000/587.33,
+    100000/659.25,
+    100000/698.46,
+    100000/783.99,
+    100000/880.00,
+    100000/987.77,
+    100000/1046.50,
+    100000/1174.66
+    };
+// The sequence of frequencies to play for the lose state
+unsigned int womp_womp[] = {
     1000000/440.00,
     1000000/415.30,
     1000000/392.00,
-    1000000/369.99,
-    0
-}
-int womp_womp_periods[] = {1, 1, 1, 2, 1}
-#define RED_BUZZ = 1000000/440.00
-#define GREEN_BUZZ = 1000000/493.88
-#define BLUE_BUZZ = 1000000/523.25
-#define YELLOW_BUZZ = 1000000/587.33
-#define OFF_BUZZ = 1
+    1000000/369.99
+    };
+// The sequence of periods to play for the lose state
+int womp_womp_periods[] = {1, 1, 1, 2, 1};
+//The periods for the respective colored-button presses.
+int RED_BUZZ = 1000000/440.00;
+int GREEN_BUZZ = 1000000/493.88;
+int BLUE_BUZZ = 1000000/523.25;
+int YELLOW_BUZZ = 1000000/587.33;
 
-
-int red_on = 0;
-int green_on = 0;
-int blue_on = 0;
-int yellow_on = 0;
-
-
-void play_sound(uint8_t *LED){
-    if(LED == red){
-        TA1CCR0 = RED_BUZZ;
-        TA1CCR2 = RED_BUZZ/2;
-    }
-    else if(LED == green){
-        TA1CCR0 = GREEN_BUZZ;
-        TA1CCR2 = GREEN_BUZZ/2;
-    }
-    else if(LED == blue){
-        TA1CCR0 = BLUE_BUZZ;
-        TA1CCR2 = BLUE_BUZZ/2;
-    }
-    else if(LED == yellow){
-        TA1CCR0 = YELLOW_BUZZ;
-        TA1CCR2 = YELLOW_BUZZ/2;
-    }
-    else{
-        TA1CCR0 = OFF_BUZZ;
-        TA1CCR2 = OFF_BUZZ/2;
-    }
-
-}
-void stop_sound(){
-    TA1CCR0 = 0;
-    TA1CCR2 = 0;
-}
+int OFF_BUZZ = 1;
 
 
 
 
-/* ---------------------------------------------------------------- */
-/* Code for generating and testing the Simon values */
 
-#define INITIAL_BUTTON 0
+/*FUNCTIONS*/
+void init(){
 
-unsigned int next_button() {
-    return rand();
-}
-unsigned int check_button(unsigned int button) {
+    P2REN |= BIT4|BIT2|BIT3|BIT0;//Reads whatever input is at bit3
+    P2IE |= BIT4|BIT2|BIT3|BIT0;
+    P2IES |= BIT4|BIT2|BIT3|BIT0;
+    P2DIR |= BIT5;
+    P2SEL |= BIT5;
+    TA1CCR0 = 1;
+    TA1CCR2 = 1;
+    // Set the timer A1 capture/compare control register 2 to output mode 7 (reset/set)
+    TA1CCTL2 = OUTMOD_7;
 
-    if (button == rand())
-        return 1;
-    else
-        return 0;
-}
-
-void reset_button_sequence(unsigned int initial_value) {
-    srand(initial_value);
-    return;
-}
-/* ---------------------------------------------------------------- */
-
-uint8_t red[] = {0xF0, 0, 0, 10};
-uint8_t blue[] = {0xF0, 0, 10, 0};
-uint8_t green[] = {0xF0, 10, 0, 0};
-uint8_t yellow[] = {0xF0, 0, 10, 10};
-uint8_t off[] = {0xE0, 0, 0, 0};
+    // Set the timer A1 control register to use the SMCLK as the clock source and count up to CCR0
+    TA1CTL = TASSEL_2 + MC_1;
 
 
+    // Set the watchdog timer interval to 250ms
+    WDTCTL = WDT_ADLY_250;
 
-int timer_wakeup_flag = 0;
-int button_wakeup_flag = 0;
-int main(void)
-{
-    enum state_enum{PresentingSequence, Lost, Win} state; // enum to describe state of system
-
-    WDTCTL = WDTPW | WDTHOLD;   // stop watchdog timer
-    DCOCTL = 0;                 // Select lowest DCOx and MODx settings
-    BCSCTL1 = CALBC1_16MHZ;     // Set range
-    DCOCTL = CALDCO_16MHZ;      // Set DCO step + modulation */
-    BCSCTL3 |= LFXT1S_2;        // ACLK = VLO - This is also called in the init_wdt() function
-    init_wdt();
+    // Enable the watchdog timer interrupt
+    IE1 |= WDTIE;
     rgb_init_spi();
-    init_buttons();
-
-    /* To make a functional Simon, you'll need to seed the random number generation system
-       randomly! */
-    int initial_random_seed = 10;
-    reset_button_sequence(initial_random_seed); // TODO: Add code to make the initial seed random!
+    rgb_set_LEDs(off, off, off, off);
 
 
-    _enable_interrupts();
+}
 
-    int leds_on = 0;
-    uint8_t *LED1, *LED2, *LED3, *LED4;
-    int sequence_counter = 0;
-    int sequence_length = 10;  // GRADING: This variable should be changed to test different sequence lengths
-    int button;
+unsigned int check_button(unsigned int right, unsigned int select){
+    return (select==right)?1:0;
+}
 
-    while (1) {
-
-        /* This template is a potentially a place to start. What it provides is a
-           foundation of a main loop which gets woken up either by a timer (the WDT)
-           or by a button press (assuming you enable the button interrupts).
-           But it needs more code:
-
-          - SOUND!!!
-
-          - Win state
-
-          - WaitingForUserInput state, including processing button inputs
-            (see check_button() function!)
-
-          - If you use the button interrupts to wake up, then processing button
-            input for maximum score will require changing the IES (edge-select)
-            register to detect the press and release as separate events.
-            + Alternatively, if you choose to use polling, you need to handle timing
-            for things like sequence presentation, timeout detection, etc. This is
-            probably easier than using interrupts, but if you naively use the TA1R
-            or TA0R registers (the counters for TA0 or TA1), they may conflict
-            with other uses of those resources for sound or serial communication.
-            + A middle ground is to use the fastest WDT wakeup and poll the button
-            states periodically (you can safely assume that button presses
-            will last at least 40-50 ms). Of course, this would still require handling
-            timeouts somehow.
-
-          - Animations for win/lose
-
-          - Processing if a timeout has occured to trigger the Lost state
-
-          - Ideally, you will abstract a bunch more so that the code will be more readable!
-        */
+void buzz(int buzz){
+    TA1CCR0 = buzz;
+    TA1CCR2 = buzz/2;
+}
 
 
-        if (timer_wakeup_flag) {
-            timer_wakeup_flag = 0;
+
+void main(void)
+
+
+{
+    enum state_enum{WaitingForUserInput, PresentingSequence, Lost, Win} state; // enum to describe state of system
+    init();
+    int sequence[5];
+    int i = 0;
+    for(i = 0; i < sizeof(sequence); i++){
+        sequence[i] = (i % 4) + 1;
+    }
+    buzz(1);
+    state = PresentingSequence;
+    __bis_SR_register(GIE);
+    while(1)
+     {
+        if(state == PresentingSequence){
+
+            int a = 0;
+            while(a < cur_round){
+                if(timer_seq == 15){
+
+                    timer_seq = 0;
+                    switch (sequence[a])
+                    {
+                       case 0:
+                           buzz(RED_BUZZ);
+                           rgb_set_LEDs(red, off, off, red);
+                            break;
+                       case 1:
+                            buzz(RED_BUZZ);
+                            rgb_set_LEDs(red, off, off, off);
+                            break;
+                       case 2:
+                            buzz(GREEN_BUZZ);
+                            rgb_set_LEDs(off, green, off, off);
+                            break;
+                       case 3:
+                            buzz(YELLOW_BUZZ);
+                            rgb_set_LEDs(off, off, yellow, off);
+                            break;
+                       case 4:
+                            buzz(BLUE_BUZZ);
+                            rgb_set_LEDs(off, off, off, blue);
+                            break;
+                       default:
+                            rgb_set_LEDs(blue, off, off, blue);
+                            break;
+                     }
+                    a++;
+
+                }
+            }
+            __delay_cycles(400000);
+            state = WaitingForUserInput;
         }
+        if(state == Lost){
+            int k = 0;
+            while(1){
+                if(timer_present == 20){
+                    timer_present = 0;
+                    if(k == 4){
+                        k = 0;
+                    }
+                    k++;
+                    wdt_wakeup_flag = 0;
+                    buzz(womp_womp[k]);
+                    rgb_set_LEDs((k > 0)? yellow : off, (k > 1)?yellow : off, (k > 2)?yellow : off, (k > 3)?yellow : off);
+                }
 
-        if (state == Lost) {
-            // TODO: Make this dynamic + with sound (more interesting) to achieve a better grade!
-            int i = 0;
-            if (i == 5){
-                i = 0;
+                if(button_wakeup_flag == 1){
+                    button_wakeup_flag = 0;
+                    state = WaitingForUserInput;
+                    cur_round = 0;
+                    break;
+
+                }
             }
-            play_sound(womp_womp[i]);
-            rgb_set_LEDs((i>=0)? red:off , (i>=1)? red:off , (i>=2)? red:off , (i >= 3)? red:off);
-            i++;
+
         }
+        if(state == Win){
+            rgb_set_LEDs(blue, blue, blue, blue);
+        }
+        if(state == WaitingForUserInput){
+            rgb_set_LEDs(off,off,off,off);
+            int j = 0;
+            for(j = 0; j < cur_round; j++){
+                    __bis_SR_register(LPM3_bits);
+                    if (button_on == sequence[j]){
+                    switch (button_on)
+                        {
+                           case 0:
+                               buzz(RED_BUZZ);
+                               rgb_set_LEDs(red, off, off, red);
+                                break;
+                           case 1:
+                                buzz(RED_BUZZ);
+                                rgb_set_LEDs(red, off, off, off);
+                                break;
+                           case 2:
+                                buzz(GREEN_BUZZ);
+                                rgb_set_LEDs(off, green, off, off);
+                                break;
+                           case 3:
+                                buzz(YELLOW_BUZZ);
+                                rgb_set_LEDs(off, off, yellow, off);
+                                break;
+                           case 4:
+                                buzz(BLUE_BUZZ);
+                                rgb_set_LEDs(off, off, off, blue);
+                                break;
+                           default:
+                                rgb_set_LEDs(blue, off, off, blue);
+                                break;
+                        }
+                    }else{
+                        state = Lost;
+                        button_wakeup_flag = 0;
+                        break;
 
-        else if (state == PresentingSequence) {
-            if (sequence_counter == 0) {
-                reset_button_sequence(initial_random_seed);
+                    }
+
             }
-            button = next_button();
-            sequence_counter = sequence_counter + 1;
-            if (sequence_counter >= sequence_length) { // TODO: This is actually the condition for winning!
-                state = Win; // TODO: Change to "Win" (need to add an enum), and add processing code for winning
-            }
-            else {
+
+            if(cur_round > (sizeof(sequence)/ sizeof(sequence[0]))){
+                state = Win;
+            }else if (state != Lost){
                 state = PresentingSequence;
+                cur_round++;
             }
 
-            LED1 = off;
-            LED2 = off;
-            LED3 = off;
-            LED4 = off;
-            switch(button) {
-            case 0:
-                LED1 = blue;
-                play_sound(LED1);
-                break;
-            case 1:
-                LED2 = red;
-                play_sound(LED2);
-                break;
-            case 2:
-                LED3 = green;
-                play_sound(LED3);
-                break;
-            case 3:
-                LED4 = yellow;
-                play_sound(LED4);
-                break;
-            }
-            rgb_set_LEDs(LED1, LED2, LED3, LED4);
+
+
         }
-        __bis_SR_register(LPM3_bits + GIE);
-    }
-    else if (state == Win) {
+     }
 
-    }
-    return 0;
 }
-// Watchdog Timer interrupt service routine
+//Button ISR3
+
 #if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
-#pragma vector=WDT_VECTOR
-__interrupt void watchdog_timer(void)
+#pragma vector= PORT2_VECTOR;
+__interrupt void PORT2_ISR (void)
 #elif defined(__GNUC__)
-void __attribute__ ((interrupt(WDT_VECTOR))) watchdog_timer (void)
+void __attribute__ ((interrupt(PORT2_VECTOR))) PORT2_ISR (void)
 #else
 #error Compiler not supported!
 #endif
 {
-    timer_wakeup_flag = 1;
-    __bic_SR_register_on_exit(LPM3_bits); // exit LPM3 when returning to program (clear LPM3 bits)
-}
+    //DR. YOUNG SAID THIS REDUCES DEBOUNCING, SO I PUT IT :)))
+    int i = 0;
+    while(i < 10000){
+        i++;
+    }
 
-// Watchdog Timer interrupt service routine
-#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
-#pragma vector=PORT2_VECTOR
-__interrupt void button(void)
-#elif defined(__GNUC__)
-void __attribute__ ((interrupt(PORT2_VECTOR))) button (void)
-#else
-#error Compiler not supported!
-#endif
-{
     button_wakeup_flag = 1;
-    red_on = 0;
-    green_on = 0;
-    blue_on = 0;
-    yellow_on = 0;
-    P2IFG &= ~(BIT0 + BIT2 + BIT3 + BIT4);
-    if(P2IFG & BIT0){
-        red_on = 1;
+
+    if((P2IFG & BIT0) && (timer_but == 4)){
+        button_on = 1;
+        timer_but = 0;
     }
-    if(P2IFG & BIT2){
-        green_on = 1;
+    else if((P2IFG & BIT2) && (timer_but == 4)){
+        button_on = 2;
+        timer_but = 0;
     }
-    if(P2IFG & BIT3){
-        yellow_on = 1;
+    else if((P2IFG & BIT3) && (timer_but == 4)){
+        button_on = 3;
+        timer_but = 0;
     }
-    if(P2IFG & BIT4){
-        blue_on = 1;
+    else if((P2IFG & BIT4) && (timer_but == 4)){
+        button_on = 4;
+        timer_but = 0;
+    }else{
+        button_on = 0;
+    }
+    P2IFG &= ~(BIT0+BIT2+BIT3+BIT4);
+    __bic_SR_register_on_exit(LPM4_bits);
+}
+#pragma vector=WDT_VECTOR;
+__interrupt void watchdog_timer (void){
+    if(timer_present < 20){
+        timer_present++;
+    }
+    if(timer_seq < 15){
+        timer_seq++;
     }
 
-    __bic_SR_register_on_exit(LPM3_bits); // exit LPM3 when returning to program (clear LPM3 bits)
+    if(timer_but < 4){
+    timer_but++;
+    }
+
+
 }
