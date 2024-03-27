@@ -12,6 +12,10 @@
  *
  * Piano Tiles:
  *
+ * 
+ * GRADERS: To switch between Simon and Piano Tiles, change the value of game_toggle to 0 or 1 (line 88)
+ *  To change the number of rounds in Simon, change the value of ROUNDS (line 84)
+ * To change the difficulty of the game, change the value of DIFFICULTY (line 82)
  * */
 
 /*CONSTANTS*/
@@ -75,14 +79,16 @@ char button_wakeup_flag = 0;
 char wdt_wakeup_flag = 0;
 
 // ** EXTRA CREDIT **
-const char DIFFICULTY = 4;
+const char DIFFICULTY = 1;
 // Determines the difficulty of the game, higher indicates less time to give inputs
-const char ROUNDS = 5;
+const char ROUNDS = 10;
 // Determines the number of rounds of either game to play
 
 // ** EXTRA CREDIT **
 const char game_toggle = 0;
 // used to determine which game to play, 0 = Simon, 1 = Piano Tiles
+// for playable/challenging Simon, i recommend ROUNDS = 10, DIFFICULTY = 1
+// for playable/challenging piano tiles, I recommend ROUNDS = 30, DIFFICULTY = 8
 char mv_char[];
 /*FUNCTIONS*/
 void init()
@@ -116,13 +122,13 @@ void init()
     rgb_set_LEDs(off, off, off, off);
     // INITIALIZE UART
     UCA0CTL1 |= UCSWRST + UCSSEL_2;
-
-    UCA0BR0 = 52; // settings for 19200 baud
-
+    // Set the baud rate to 19200
+    UCA0BR0 = 52;
     UCA0BR1 = 0;
 
+    // Set the modulation to 0
     UCA0MCTL = UCBRS_0;
-
+    // Set the control register to use the SMCLK and release the reset
     UCA0CTL1 &= ~UCSWRST;
 }
 
@@ -201,7 +207,7 @@ void button_buzz(char button)
 
 void ser_output(char *str)
 {
-
+    // iterates through the string and sends each character
     while (*str != 0)
     {
 
@@ -218,7 +224,7 @@ void reverse(char s[])
     int i, j;
 
     char c;
-
+    // reverses the string
     for (i = 0, j = sizeof(s) - 1; i < j; i++, j--)
     {
 
@@ -233,13 +239,13 @@ void itoa(int n, char s[])
 {
 
     int i, sign;
-
+    // converts an integer to a string
     if ((sign = n) < 0) /* record sign */
 
         n = -n; /* make n positive */
 
     i = 0;
-
+    // iterates through the number and adds each digit to the string
     do
     { /* generate digits in reverse order */
 
@@ -336,8 +342,10 @@ void main(void)
         {
             char b = 0;
             button_wakeup_flag = 0;
+            // iterates through the win sequence
             while (1)
             {
+                // if the timer is at 20, it will play the next button press in the win sequence
                 if (timer_present == 20)
                 {
                     timer_present = 0;
@@ -346,19 +354,23 @@ void main(void)
                         b = 0;
                     }
                     b++;
-
+                    // plays the next button press in the win sequence
                     rgb_set_LEDs(((b % 4) == 0) ? yellow : off, ((b % 4) == 2) ? yellow : off, ((b % 4) == 3) ? yellow : off, ((b % 4) == 1) ? yellow : off);
+                    // plays the next button press in the win sequence
                     buzz(win[b]);
                 }
+                // if the button is pressed, it will reset the sequence and start the game
                 if (button_wakeup_flag == 1)
                 {
-
+                    // re-seeds the random number generator based on the timer
+                    // creates a truly random sequence
                     srand(timer);
                     // Fill the sequence with random button presses
                     for (i = 0; i < sizeof(sequence); i++)
                     {
                         sequence[i] = rand() + 1;
                     }
+                    // resets the button wakeup flag
                     button_wakeup_flag = 0;
                     state = WaitingForUserInput;
                     cur_round = 0;
@@ -369,46 +381,53 @@ void main(void)
 
         if (state == WaitingForUserInput)
         {
+
             rgb_set_LEDs(off, off, off, off);
             buzz(OFF_BUZZ);
             char j = 0;
+            // checks to see if the game is in Simon mode
             if (game_toggle == 0)
             {
+                // iterates up to the current round
                 for (j = 0; j < cur_round; j++)
                 {
                     timeout = 0;
-
+                    // waits for the user to press a button
                     wdt_wakeup_flag = 1;
                     LPM3;
+                    // if the user takes too long, they lose
                     if (wdt_wakeup_flag == 0)
                     {
                         state = Lost;
                         break;
                     }
+                    // sends the score to the UART  
                     itoa((int)button_on, mv_char);
-
                     ser_output("SCORE");
-
                     ser_output(mv_char);
-
                     ser_output("\r\s");
+                    // if the user presses the correct button, it will light the button and buzz
                     if (button_on == sequence[j])
                     {
                         button_light(sequence[j]);
                         button_buzz(sequence[j]);
                     }
+                    // if the user presses the wrong button, they lose
                     else
                     {
                         state = Lost;
                         break;
                     }
+                    
                     rgb_set_LEDs(off, off, off, off);
                     buzz(OFF_BUZZ);
                 }
+                // if the user has completed this round, it will check to see if they have won
                 if (cur_round == (sizeof(sequence) / sizeof(sequence[0])) && (state != Lost))
                 {
                     state = Win;
                 }
+                // if the user hasnt lost or won, it will present the next sequence
                 else if (state != Lost)
                 {
                     state = PresentingSequence;
@@ -416,29 +435,36 @@ void main(void)
                 }
             }
             // ** EXTRA CREDIT **
+            // presumes the game is in Piano Tiles mode
             else
             {
+                // iterates through the sequence
                 for (j = 0; j < ROUNDS; j++)
                 {
+                    // lights the button and waits for the user to press it
                     button_light(sequence[j]);
                     timeout = 0;
                     wdt_wakeup_flag = 1;
                     LPM3;
+                    // if the user takes too long, they lose
                     if (wdt_wakeup_flag == 0)
                     {
                         state = Lost;
                         break;
                     }
+                    // if the user presses the correct button, it will light the button and buzz
                     if (button_on == sequence[j])
                     {
                         button_buzz(button_on);
                     }
+                    // if the user presses the wrong button, they lose
                     else
                     {
                         state = Lost;
                         break;
                     }
                 }
+                // if the user completes the sequence, they win
                 if (state != Lost)
                 {
                     state = Win;
@@ -453,33 +479,38 @@ __interrupt void PORT2_ISR(void)
 {
     // DR. YOUNG SAID THIS REDUCES DEBOUNCING, SO I PUT IT :)))
     int i = 0;
-    while (i < 1000)
+    while (i < 10000)
     {
         i++;
     }
-
+    // sets the general button wakeup flag
     button_wakeup_flag = 1;
-
+    // sets the button pressed based on the button pressed
+    // red button
     if ((P2IFG & BIT0) && (timer_but == 2))
     {
         button_on = 1;
         timer_but = 0;
     }
+    // green button
     else if ((P2IFG & BIT2) && (timer_but == 2))
     {
         button_on = 2;
         timer_but = 0;
     }
+    // yellow button
     else if ((P2IFG & BIT3) && (timer_but == 2))
     {
         button_on = 3;
         timer_but = 0;
     }
+    // blue button
     else if ((P2IFG & BIT4) && (timer_but == 2))
     {
         button_on = 4;
         timer_but = 0;
     }
+    // no button
     else
     {
         button_on = 0;
@@ -490,11 +521,14 @@ __interrupt void PORT2_ISR(void)
 #pragma vector = WDT_VECTOR;
 __interrupt void watchdog_timer(void)
 {
+    // increments the timer
+    // this timer is used for all presentation modes
     if (timer_present < 20)
     {
         timer_present++;
     }
-
+    // increments the timer
+    // this timer is used to time out the user if they take too long
     if (wdt_wakeup_flag == 1)
     {
         timeout++;
@@ -505,9 +539,12 @@ __interrupt void watchdog_timer(void)
             __bic_SR_register_on_exit(LPM3_bits);
         }
     }
+    // increments the timer
+    // this timer is used to debounce the buttons
     if (timer_but < 2)
     {
         timer_but++;
     }
+    // this timer is used to seed the RNG
     timer++;
 }
